@@ -8,7 +8,7 @@
 //#define __FLIPSENSORS_OUT__
 //#define __FLIPSENSORS_IN__
 
-#include <Extractor.h>
+#include <Extractor.hh>
 #include <cstdlib>
 
 namespace insur {
@@ -779,7 +779,11 @@ namespace insur {
 	      xml_base_lowerupper = xml_base_lower;
 	      shape.name_tag = mname.str() + xml_base_lowerupper + xml_base_waf;
 	    }	    
-	    else shape.name_tag = mname.str() + xml_PX + xml_base_waf;
+	    else {
+	      if (iiter->getModule().isPixelModule()) shape.name_tag = mname.str() + xml_PX + xml_base_waf;
+	      else if (iiter->getModule().isTimingModule()) shape.name_tag = mname.str() + xml_timing + xml_base_waf;
+	      else { std::cerr << "Wafer : Unknown module type : " << iiter->getModule().moduleType() << "." << std::endl; }
+	    }
 
 	    // SolidSection
             shape.name_tag = shape.name_tag;
@@ -847,8 +851,9 @@ namespace insur {
 
 	    if (iiter->getModule().moduleType() == "ptPS") shape.name_tag = mname.str() + xml_base_lowerupper + xml_base_ps + xml_base_pixel + xml_base_act;
 	    else if (iiter->getModule().moduleType() == "pt2S") shape.name_tag = mname.str() + xml_base_lowerupper + xml_base_2s+ xml_base_act;
+	    else if (iiter->getModule().isTimingModule()) shape.name_tag = mname.str() + xml_timing + xml_base_act;
 	    else if (iiter->getModule().isPixelModule()) shape.name_tag = mname.str() + xml_PX + xml_base_Act;
-	    else { std::cerr << "Unknown module type : " << iiter->getModule().moduleType() << " ." << std::endl; }
+	    else { std::cerr << "Active surface : Unknown module type : " << iiter->getModule().moduleType() << "." << std::endl; }
 
 	    // SolidSection
 	    shape.dx = iiter->getModule().area() / iiter->getModule().length() / 2.0;
@@ -864,7 +869,11 @@ namespace insur {
 
 	    // PosPart section
 	    if (iiter->getModule().numSensors() == 2) pos.parent_tag = trackerXmlTags.nspace + ":" + mname.str() + xml_base_lowerupper + xml_base_waf;
-	    else pos.parent_tag = trackerXmlTags.nspace + ":" + mname.str() + xml_PX + xml_base_waf;
+	    else {
+	      if (iiter->getModule().isTimingModule()) pos.parent_tag = trackerXmlTags.nspace + ":" + mname.str() + xml_timing + xml_base_waf;
+	      else if (iiter->getModule().isPixelModule()) pos.parent_tag = trackerXmlTags.nspace + ":" + mname.str() + xml_PX + xml_base_waf;
+	      else { std::cerr << "Positioning active surface : Unknown module type : " << iiter->getModule().moduleType() << "." << std::endl; }
+	    }
             pos.child_tag = trackerXmlTags.nspace + ":" + shape.name_tag;
             pos.trans.dz = 0.0;
 #ifdef __FLIPSENSORS_IN__ // Flip INNER sensors
@@ -888,7 +897,7 @@ namespace insur {
 	      // SolidSection
 	      if (iiter->getModule().moduleType() == "ptPS") shape.name_tag = mname.str() + xml_base_lowerupper + xml_base_ps + xml_base_strip + xml_base_act;
 	      else if (iiter->getModule().moduleType() == "pt2S") shape.name_tag = mname.str() + xml_base_lowerupper + xml_base_2s+ xml_base_act;
-	      else { std::cerr << "Unknown module type : " << iiter->getModule().moduleType() << " ." << std::endl; }
+	      else { std::cerr << "Active surface : Unknown module type : " << iiter->getModule().moduleType() << "." << std::endl; }
               s.push_back(shape);
 
 	      // LogicalPartSection
@@ -1437,7 +1446,17 @@ namespace insur {
 	    ringzmax.at(modRing) = MAX(ringzmax.at(modRing), modcomplex.getZmax());
 	  }
 	}
-	double diskThickness = zmax - zmin;
+
+	double diskZ = 0;
+	if (ringsIndexes.size() < 2) std::cout << "!!!!!!Disk with less than 2 rings, unexpected" << std::endl;
+	else {
+	  int firstRingIndex = *(ringsIndexes.begin());
+	  int secondRingIndex = *ringsIndexes.begin() + 1;
+	  diskZ = (ringzmin.at(firstRingIndex) + ringzmax.at(firstRingIndex) + ringzmin.at(secondRingIndex) + ringzmax.at(secondRingIndex)) / 4.;
+	}
+	
+	//double diskThickness = zmax - zmin;
+	double diskThickness = 2. * MAX(fabs(zmin - diskZ), fabs(zmax - diskZ));
 
 	//shape.type = tp;
         shape.rmin = 0.0;
@@ -1542,8 +1561,12 @@ namespace insur {
             if (iiter->getModule().numSensors() == 2) {
 	      xml_base_lowerupper = xml_base_lower;
 	      shape.name_tag = mname.str() + xml_base_lowerupper + xml_base_waf;
-	    }	    
-	    else shape.name_tag = mname.str() + xml_PX + xml_base_waf;	     
+	    }
+	    else {
+	      if (iiter->getModule().isPixelModule()) shape.name_tag = mname.str() + xml_PX + xml_base_waf;
+	      else if (iiter->getModule().isTimingModule()) shape.name_tag = mname.str() + xml_timing + xml_base_waf;
+	      else { std::cerr << "Wafer : Unknown module type : " << iiter->getModule().moduleType() << "." << std::endl; }
+	    }     
 
 	      shape.dz = iiter->getModule().sensorThickness() / 2.0; // CUIDADO WAS calculateSensorThickness(*iiter, mt) / 2.0;
 	      //if (iiter->getModule().numSensors() == 2) shape.dz = shape.dz / 2.0; // CUIDADO calcSensThick returned 2x what getSensThick returns, it means that now one-sided sensors are half as thick if not compensated for in the config files
@@ -1607,8 +1630,9 @@ namespace insur {
 	      
 	      if (iiter->getModule().moduleType() == "ptPS") shape.name_tag = mname.str() + xml_base_lowerupper + xml_base_ps + xml_base_pixel + xml_base_act;
 	      else if (iiter->getModule().moduleType() == "pt2S") shape.name_tag = mname.str() + xml_base_lowerupper + xml_base_2s+ xml_base_act;
+	      else if (iiter->getModule().isTimingModule()) shape.name_tag = mname.str() + xml_timing + xml_base_act;
 	      else if (iiter->getModule().isPixelModule()) shape.name_tag = mname.str() + xml_PX + xml_base_Act;
-	      else { std::cerr << "Unknown module type : " << iiter->getModule().moduleType() << " ." << std::endl; }
+	      else { std::cerr << "Active surface : Unknown module type : " << iiter->getModule().moduleType() << "." << std::endl; }
 	      s.push_back(shape);
 
 	      logic.name_tag = shape.name_tag;
@@ -1617,7 +1641,12 @@ namespace insur {
 	      l.push_back(logic);
 
 	      if (iiter->getModule().numSensors() == 2) pos.parent_tag = trackerXmlTags.nspace + ":" + mname.str() + xml_base_lowerupper + xml_base_waf;
-	      else pos.parent_tag = trackerXmlTags.nspace + ":" + mname.str() + xml_PX + xml_base_waf;
+	      else {
+		if (iiter->getModule().isTimingModule()) pos.parent_tag = trackerXmlTags.nspace + ":" + mname.str() + xml_timing + xml_base_waf;
+		else if (iiter->getModule().isPixelModule())  pos.parent_tag = trackerXmlTags.nspace + ":" + mname.str() + xml_PX + xml_base_waf;
+		else { std::cerr << "Positioning active surface : Unknown module type : " << iiter->getModule().moduleType() << "." << std::endl; }
+	      }
+
 	      pos.child_tag = logic.shape_tag;
 	      pos.trans.dz = 0.0;
 #ifdef __FLIPSENSORS_IN__ // Flip INNER sensors
@@ -1640,7 +1669,7 @@ namespace insur {
 
 		if (iiter->getModule().moduleType() == "ptPS") shape.name_tag = mname.str() + xml_base_lowerupper + xml_base_ps + xml_base_strip + xml_base_act;
 		else if (iiter->getModule().moduleType() == "pt2S") shape.name_tag = mname.str() + xml_base_lowerupper + xml_base_2s+ xml_base_act;
-		else { std::cerr << "Unknown module type : " << iiter->getModule().moduleType() << " ." << std::endl; }
+		else { std::cerr << "Active surface : Unknown module type : " << iiter->getModule().moduleType() << "." << std::endl; }
 		s.push_back(shape);
 
 		logic.name_tag = shape.name_tag;
@@ -1744,7 +1773,7 @@ namespace insur {
             pos.parent_tag = trackerXmlTags.nspace + ":" + dname.str(); // CUIDADO ended with: + xml_plus;
             pos.child_tag = logic.shape_tag;
 
-	    pos.trans.dz = (rinfo[*siter].zmin + rinfo[*siter].zmax) / 2.0 - (zmin + zmax) / 2.0;
+	    pos.trans.dz = (rinfo[*siter].zmin + rinfo[*siter].zmax) / 2.0 - diskZ;
             p.push_back(pos);
             //pos.parent_tag = trackerXmlTags.nspace + ":" + dname.str(); // CUIDADO ended with: + xml_minus;
             //p.push_back(pos);
@@ -1822,7 +1851,8 @@ namespace insur {
 
         pos.parent_tag = xml_pixfwdident + ":" + trackerXmlTags.fwd;
         pos.child_tag = trackerXmlTags.nspace + ":" + logic.name_tag;
-        pos.trans.dz = (zmax + zmin) / 2.0 - xml_z_pixfwd;
+        //pos.trans.dz = (zmax + zmin) / 2.0 - xml_z_pixfwd;
+	pos.trans.dz = diskZ - xml_z_pixfwd;
         p.push_back(pos);
 
         dspec.partselectors.push_back(logic.name_tag);
@@ -1905,7 +1935,7 @@ namespace insur {
 
 	  // TO DO : CALCULATION OF OUTERMOST SHAPES BOUNDARIES
 	  double startEndcaps;
-	  if (!isPixelTracker) startEndcaps = 1281.;
+	  if (!isPixelTracker) startEndcaps = 1250.;
 	  //else startEndcaps = 300.; // PIXEL 1_1_1
 	  else startEndcaps = 227.;   // PIXEL 4_0_2_1
           
@@ -1944,7 +1974,7 @@ namespace insur {
 
 	      // Barrel part
 	      shape.name_tag = shapenameBarrel.str();
-	      shape.dz = (startEndcaps - iter->getZOffset()) / 2.0;
+	      shape.dz = (startEndcaps - iter->getZOffset()) / 2.0 - xml_epsilon;
 	      shape.rmin = iter->getInnerRadius();
 	      shape.rmax = shape.rmin + iter->getRWidth();
 	      s.push_back(shape);
@@ -1958,7 +1988,7 @@ namespace insur {
 
 	      pos.parent_tag = xml_pixbarident + ":" + trackerXmlTags.bar; //xml_tracker;
 	      pos.child_tag = logic.shape_tag;
-	      pos.trans.dz = iter->getZOffset() + shape.dz;
+	      pos.trans.dz = iter->getZOffset() + shape.dz + xml_epsilon;
 	      p.push_back(pos);
 	      pos.copy = 2;
 	      pos.trans.dz = -pos.trans.dz;
@@ -1971,7 +2001,7 @@ namespace insur {
 
 	      // Endcaps part
 	      shape.name_tag = shapenameEndcaps.str();
-	      shape.dz = (iter->getZOffset() + iter->getZLength() - startEndcaps) / 2.0;
+	      shape.dz = (iter->getZOffset() + iter->getZLength() - startEndcaps) / 2.0 - xml_epsilon;
 	      shape.rmin = iter->getInnerRadius();
 	      shape.rmax = shape.rmin + iter->getRWidth();
 	      s.push_back(shape);    
@@ -1985,7 +2015,7 @@ namespace insur {
 
 	      pos.parent_tag = xml_pixfwdident + ":" + trackerXmlTags.fwd; // xml_tracker;
 	      pos.child_tag = logic.shape_tag;
-	      pos.trans.dz = startEndcaps + shape.dz - xml_z_pixfwd;
+	      pos.trans.dz = startEndcaps + shape.dz + xml_epsilon - xml_z_pixfwd;
 	      p.push_back(pos);
 
 
@@ -2090,7 +2120,7 @@ namespace insur {
 
 	  // TO DO : CALCULATION OF OUTERMOST SHAPES BOUNDARIES
 	  double startEndcaps;
-	  if (!isPixelTracker) startEndcaps = 1281.;
+	  if (!isPixelTracker) startEndcaps = 1250.;
 	  //else startEndcaps = 300.; // PIXEL 1_1_1
 	  else startEndcaps = 227.;   // PIXEL 4_0_2_1          
 
